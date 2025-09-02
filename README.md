@@ -1,6 +1,3 @@
-Sure! Here's a clean, beginner-friendly, and professional `README.md` for your **Go User Management project** using **gRPC** and **Gin**, **without any email checking logic** mentioned.
-
----
 
 🚀 User Management System — Go + gRPC + Gin
 
