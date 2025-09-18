@@ -1,0 +1,73 @@
+# This workflow will build a golang project and create Docker image
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: User Management CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.25'
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Verify dependencies
+      run: go mod verify
+
+    - name: Build application
+      run: go build -v -o main ./cmd/server
+
+    - name: Run tests (if any exist)
+      run: |
+        if [ -n "$(find . -name '*_test.go')" ]; then
+          go test -v ./...
+        else
+          echo "No tests found, skipping test step"
+        fi
+
+  docker:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: false
+        tags: user-management:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Test Docker image
+      run: |
+        docker run --rm -d --name test-container -p 8000:8000 -p 8080:8080 user-management:latest
+        sleep 5
+        curl -f http://localhost:8000/users || exit 1
+        docker stop test-container
